@@ -5,6 +5,7 @@ import ast
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as sf
+from datetime import datetime
 
 
 def make_cab_table(verb = False):
@@ -43,6 +44,7 @@ def make_cab_table(verb = False):
         .withColumn('permile', cabs.total / cabs.dist) \
         .withColumn('permin', cabs.total / cabs.dur * 60) \
         .drop('dist', 'dur')
+    if verb: cabs.schema
     if verb: print(cabs.head(5))
 
     cab_agg = cabs \
@@ -91,21 +93,35 @@ def make_weather_table(verb = False):
         .withColumn('day', sf.date_format(wthr.date, 'u')) \
         .withColumn('hour', sf.hour(wthr.date)) \
         .drop('Tdry', 'precip', 'date')
+    if verb: wthr.schema
     if verb: print(wthr.head(5))
     return wthr
 
 
+def showtime():
+    """Return current time as string."""
+    now = datetime.now()
+    now_str = now.strftime("%H:%M:%S")
+    return now_str
+
+
+# save start time
+start = showtime()
 # suppress info messages
 sc = SparkContext()
 sc.setLogLevel("ERROR")
 # start a spark session
 spark = SparkSession.builder.appName('testpipe').getOrCreate()
 
+print('Script started at:', start)
 verb = False
 cabs = make_cab_table(verb)
+print('Cab ingestion done:', showtime())
 wthr = make_weather_table(verb)
+print('Weather ingestion done:', showtime())
 combo = cabs.join(sf.broadcast(wthr), cabs.startrnd == wthr.timernd) \
     .drop('startrnd', 'timernd')
+print('Cab-weather join done:', showtime())
 if verb: print(combo.head(5))
 
 hist = combo \
@@ -115,8 +131,9 @@ hist = combo \
          sf.mean('avg_permile').alias('d_mile'),
          sf.mean('avg_permin').alias('d_min'),
          sf.count(sf.lit(1)).alias('avged_over'))
+print('Historical table done:', showtime())
 
-print('Historical data table has', hist.count(), 'rows.')
+if verb: print('Historical data table has', hist.count(), 'rows.')
 #hist.sort('d_hr_cab', ascending = False).show()
 #hist.sort('avged_over', ascending = False).show()
 #hist.sort('prnd', ascending = False).show()
@@ -136,4 +153,4 @@ hist.write.jdbc(dburl, table, mode = 'overwrite',
                           "password":password,
                           "driver":driver})
 
-print('Script finished')
+print('Script finished:', showtime())
