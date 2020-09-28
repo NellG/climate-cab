@@ -130,10 +130,11 @@ def write_table(hist, verb = False):
     password = config['password']
     driver = "org.postgresql.Driver"
 
-    hist.write.jdbc(dburl, table, mode = 'overwrite',
-                properties={"user":user,
-                            "password":password,
-                            "driver":driver})
+    hist.write.option('truncate', 'true') \
+        .jdbc(dburl, table, mode = 'overwrite', 
+            properties={"user":user,
+                        "password":password,
+                        "driver":driver})
 
 
 def showtime():
