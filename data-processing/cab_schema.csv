@@ -1,0 +1,2 @@
+id,taxi,start_str,Trip End Timestamp,dur,dist,Pickup Census Tract,Dropoff Census Tract,Pickup Community Area,Dropoff Community Area,fare,tip,Tolls,extra,Trip Total,Payment Type,Company,Pickup Centroid Latitude,Pickup Centroid Longitude,Pickup Centroid Location,Dropoff Centroid Latitude,Dropoff Centroid Longitude,Dropoff Centroid  Location,
+string,string,string,string,float,float,string,string,string,string,float,float,string,float,string,string,string,string,string,string,string,string,string,string

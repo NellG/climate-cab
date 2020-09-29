@@ -9,6 +9,7 @@
 # --conf spark.driver.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4=true
 # --master spark://10.0.0.14:7077 spark.py
 import ast
+import csv
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as sf
@@ -23,50 +24,24 @@ def make_cab_table(years, verb = False):
     Calculate total cost without tolls
     Calculate $/mile
     Calculate $/min
+    Aggregate into hourly averages
     """
 
-    schema = StructType() \
-        .add('id', 'string', True) \
-        .add('taxi', 'string', True) \
-        .add('start_str', 'string', True) \
-        .add('end', 'string', True) \
-        .add('dur', 'float', True) \
-        .add('dist', 'float', True) \
-        .add('pickup_tract', 'string', True) \
-        .add('dropoff_tract', 'string', True) \
-        .add('pickup_area', 'string', True) \
-        .add('dropoff_area', 'string', True) \
-        .add('fare', 'float', True) \
-        .add('tip', 'float', True) \
-        .add('toll', 'string', True) \
-        .add('extra', 'float', True) \
-        .add('payment', 'string', True) \
-        .add('company', 'string', True) \
-        .add('pickup_lat', 'string', True) \
-        .add('pickup_long', 'string', True) \
-        .add('pickup_loc', 'string', True) \
-        .add('dropoff_lat', 'string', True) \
-        .add('dropoff_long', 'string', True) \
-        .add('dropoff_loc', 'string', True) 
+    # load cab table schema
+    with open('cab_schema.csv', newline='') as f:
+        reader = csv.reader(f)
+        cab_cols = list(reader)
+    schema = StructType()
+    for i, name in enumerate(cab_cols[0]):
+        schema.add(name, cab_cols[1][i], True) 
 
+    # load cab data
     cabfiles = ['chi_201'+n+'.csv' for n in years]
     cabbucket = 's3a://chi-cab-bucket/taxi/'
     cabpaths = [cabbucket + f for f in cabfiles]
-    cabs = spark.read.option('header', True) \
-        .schema(schema).csv(cabpaths)
-    #cabs.printSchema()
+    cabs = spark.read.option('header', True).schema(schema).csv(cabpaths)
     if verb: print('Cab data table has', cabs.count(), 'rows.')
 
-    # grab desired columns
-    cab_cols = [#('Trip ID', 'trip', 'string'),
-                ('Taxi ID', 'taxi', 'string'),
-                ('Trip Start Timestamp', 'start_str', 'string'),
-                ('Trip Seconds', 'dur', 'float'),
-                ('Trip Miles', 'dist', 'float'),
-                ('Fare', 'fare', 'float'),
-                ('Tips', 'tip', 'float'),
-                ('Extras', 'extra', 'float')]
-        #.select([sf.col(c).alias(n).cast(t) for (c, n, t) in cab_cols]) \
     cabs = cabs \
         .select(['taxi', 'start_str', 'dur', 'dist', 'fare', 'tip', 'extra']) \
         .fillna(0, subset=['fare', 'tip', 'extra']) \
@@ -104,48 +79,27 @@ def make_weather_table(years, verb = False):
     Ceil hourly precipitation to nearest 0.2 in
     Round timestamp to nearest hour
     """
+
+    # load weather table schema
+    with open('weather_schema.csv', newline='') as f:
+        reader = csv.reader(f)
+        wthr_cols = list(reader)
+    schema = StructType()
+    for i, name in enumerate(wthr_cols[0]):
+        schema.add(name, wthr_cols[1][i], True)
+
+    # load weather data
     wthrfiles = ['chi-weather_201'+n+'.csv' for n in years]
     wthrbucket = 's3a://chi-cab-bucket/weather/'
     wthrpaths = [wthrbucket + f for f in wthrfiles]
-    wthr = spark.read.option('header', True).csv(wthrpaths)
+    wthr = spark.read.option('header', True).schema(schema).csv(wthrpaths)
     if verb: print('Weather data table has', wthr.count(), 'rows.')
 
-    schema = StructType() \
-        .add('station', 'string', True) \
-        .add('date', 'string', True) \
-        .add('start_str', 'string', True) \
-        .add('end', 'string', True) \
-        .add('dur', 'float', True) \
-        .add('dist', 'float', True) \
-        .add('pickup_tract', str_int, True) \
-        .add('dropoff_tract', str_int, True) \
-        .add('pickup_area', str_int, True) \
-        .add('dropoff_area', str_int, True) \
-        .add('fare', 'float', True) \
-        .add('tip', 'float', True) \
-        .add('toll', 'string', True) \
-        .add('extra', 'float', True) \
-        .add('payment', 'string', True) \
-        .add('company', 'string', True) \
-        .add('pickup_lat', 'string', True) \
-        .add('pickup_long', 'string', True) \
-        .add('pickup_loc', 'string', True) \
-        .add('dropoff_lat', 'string', True) \
-        .add('dropoff_long', 'string', True) \
-        .add('dropoff_loc', 'string', True) 
-
-    # grab desired columns and types from weather
-    wthr_cols = [#('STATION', 'station', 'string'), 
-                 ('DATE', 'date', 'timestamp'),
-                 ('HourlyDryBulbTemperature', 'tdry','float'),
-                 ('HourlyPrecipitation', 'precip', 'float')]
     wthr = wthr \
-        .select([sf.col(c).alias(n).cast(t) for (c, n, t) in wthr_cols]) \
-        .filter(wthr.STATION == '72534014819') \
-        .filter(wthr.REPORT_TYPE2 == 'FM-15') \
+        .select('date', 'tdry', 'precip') \
+        .filter(wthr.station == '72534014819') \
+        .filter(wthr.report == 'FM-15') \
         .fillna({'precip':0})
-    
-    # round temperature, precipitation, time
     wthr = wthr \
         .withColumn('trnd', sf.round(wthr.tdry/10)*10) \
         .withColumn('prnd', sf.ceil(wthr.precip*5)/5) \
@@ -214,7 +168,7 @@ spark = SparkSession.builder.appName('testpipe').getOrCreate()
 
 print('Script started at:', start)
 verb = False
-years = '89'
+years = '3456789'
 cabs = make_cab_table(years, verb)
 print('Cab ingestion done:', showtime())
 wthr = make_weather_table(years, verb)
