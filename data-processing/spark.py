@@ -1,6 +1,13 @@
 # launch pyspark interpreter with:
 # usr/local/spark/bin/pyspark --master spark://privateip:7077 --packages/
 # org.apache.hadoop:hadoop-aws:2.7.7,org.postgresql:postgresql:42.2.16.jre7
+
+# launch script with:
+# spark-submit 
+# --packages com.amazonaws:aws-java-sdk:1.7.4,org.apache.hadoop:hadoop-aws:2.7.7,org.postgresql:postgresql:42.2.16.jre7 
+# --conf spark.executor.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4=true
+# --conf spark.driver.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4=true
+# --master spark://10.0.0.14:7077 spark.py
 import ast
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
@@ -154,7 +161,7 @@ spark = SparkSession.builder.appName('testpipe').getOrCreate()
 
 print('Script started at:', start)
 verb = False
-years = '3456789'
+years = '89'
 cabs = make_cab_table(years, verb)
 print('Cab ingestion done:', showtime())
 wthr = make_weather_table(years, verb)

@@ -8,9 +8,11 @@ import pandas as pd
 import ast
 import psycopg2
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+#external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+external_stylesheets = ['https://github.com/NellG/climate-cab/blob/master/app/style.css']
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+#app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__)
 
 # Read in Open Weather Map config file
 configfile = '/home/ubuntu/code/.plotly-config'
@@ -42,6 +44,7 @@ fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['d_hr_cab']),
               row=3, col=1)
 fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['d_mile']),
               row=4, col=1)
+fig.update_layout(template='plotly_dark')
 
 def weatherplot():
     fig_weather = px.line(foredf, x='time', y='tdry', 
