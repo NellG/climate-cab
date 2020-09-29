@@ -13,6 +13,7 @@ from pyspark import SparkContext
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as sf
 from datetime import datetime
+from pyspark.sql.types import StructType
 
 
 def make_cab_table(years, verb = False):
@@ -23,10 +24,37 @@ def make_cab_table(years, verb = False):
     Calculate $/mile
     Calculate $/min
     """
+
+    schema = StructType() \
+        .add('id', 'string', True) \
+        .add('taxi', 'string', True) \
+        .add('start_str', 'string', True) \
+        .add('end', 'string', True) \
+        .add('dur', 'float', True) \
+        .add('dist', 'float', True) \
+        .add('pickup_tract', 'string', True) \
+        .add('dropoff_tract', 'string', True) \
+        .add('pickup_area', 'string', True) \
+        .add('dropoff_area', 'string', True) \
+        .add('fare', 'float', True) \
+        .add('tip', 'float', True) \
+        .add('toll', 'string', True) \
+        .add('extra', 'float', True) \
+        .add('payment', 'string', True) \
+        .add('company', 'string', True) \
+        .add('pickup_lat', 'string', True) \
+        .add('pickup_long', 'string', True) \
+        .add('pickup_loc', 'string', True) \
+        .add('dropoff_lat', 'string', True) \
+        .add('dropoff_long', 'string', True) \
+        .add('dropoff_loc', 'string', True) 
+
     cabfiles = ['chi_201'+n+'.csv' for n in years]
     cabbucket = 's3a://chi-cab-bucket/taxi/'
     cabpaths = [cabbucket + f for f in cabfiles]
-    cabs = spark.read.option('header', True).csv(cabpaths)
+    cabs = spark.read.option('header', True) \
+        .schema(schema).csv(cabpaths)
+    #cabs.printSchema()
     if verb: print('Cab data table has', cabs.count(), 'rows.')
 
     # grab desired columns
@@ -38,8 +66,9 @@ def make_cab_table(years, verb = False):
                 ('Fare', 'fare', 'float'),
                 ('Tips', 'tip', 'float'),
                 ('Extras', 'extra', 'float')]
+        #.select([sf.col(c).alias(n).cast(t) for (c, n, t) in cab_cols]) \
     cabs = cabs \
-        .select([sf.col(c).alias(n).cast(t) for (c, n, t) in cab_cols]) \
+        .select(['taxi', 'start_str', 'dur', 'dist', 'fare', 'tip', 'extra']) \
         .fillna(0, subset=['fare', 'tip', 'extra']) \
         .fillna(1, subset=['dur', 'dist'])
     cabs = cabs \
@@ -80,6 +109,30 @@ def make_weather_table(years, verb = False):
     wthrpaths = [wthrbucket + f for f in wthrfiles]
     wthr = spark.read.option('header', True).csv(wthrpaths)
     if verb: print('Weather data table has', wthr.count(), 'rows.')
+
+    schema = StructType() \
+        .add('station', 'string', True) \
+        .add('date', 'string', True) \
+        .add('start_str', 'string', True) \
+        .add('end', 'string', True) \
+        .add('dur', 'float', True) \
+        .add('dist', 'float', True) \
+        .add('pickup_tract', str_int, True) \
+        .add('dropoff_tract', str_int, True) \
+        .add('pickup_area', str_int, True) \
+        .add('dropoff_area', str_int, True) \
+        .add('fare', 'float', True) \
+        .add('tip', 'float', True) \
+        .add('toll', 'string', True) \
+        .add('extra', 'float', True) \
+        .add('payment', 'string', True) \
+        .add('company', 'string', True) \
+        .add('pickup_lat', 'string', True) \
+        .add('pickup_long', 'string', True) \
+        .add('pickup_loc', 'string', True) \
+        .add('dropoff_lat', 'string', True) \
+        .add('dropoff_long', 'string', True) \
+        .add('dropoff_loc', 'string', True) 
 
     # grab desired columns and types from weather
     wthr_cols = [#('STATION', 'station', 'string'), 
