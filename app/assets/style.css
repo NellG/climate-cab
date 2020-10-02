@@ -229,15 +229,15 @@ a:hover {
 
 
 .main-svg{
-  font-family: "Open Sans Semi Bold"
+  font-family: "Trebuchet MS"
 }
 
 .gtitle{
-  font-family: "Open Sans Semi Bold" !important
+  font-family: "Trebuchet MS" !important
 }
 
 .g-title{
-  font-family: "Open Sans Semi Bold"
+  font-family: "Trebuchet MS"
 }
 
 
@@ -431,7 +431,13 @@ body {
 }
 
 h1, h2, h3, h4, h5 {
-  font-family: "Open Sans Semi Bold";
+  font-family: "Trebuchet MS";
+  letter-spacing: 2.1px;
+  font-size: 42px;
+  padding-left: 12px;
+}
+h3, h4, h5 {
+  font-family: "Trebuchet MS";
   letter-spacing: 2.1px;
   font-size: 21px;
   padding-left: 12px;

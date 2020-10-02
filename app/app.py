@@ -36,15 +36,25 @@ foredf = pd.DataFrame(pgcursor.fetchall(),
 
 fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
                     vertical_spacing=0.04)
-fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['tdry']),
+fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['tdry'], name='Temperature, F'),
               row=1, col=1)
-fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['taxis']),
+fig.add_bar(x=foredf['time'], y=foredf['precip']*100,
+            row=1, col=1, name='Rain, in x100')
+fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['taxis'], name='# Taxis'),
               row=2, col=1)
-fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['d_hr_cab']),
+fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['d_hr_cab'], name='$/hour/cab'),
               row=3, col=1)
-fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['d_mile']),
+fig.add_trace(go.Scatter(x=foredf['time'], y=foredf['d_mile'], name='$/mile'),
               row=4, col=1)
-fig.update_layout(template='plotly_dark')
+fig.update_layout(template='plotly_dark',
+                  paper_bgcolor='#1E1E1E', 
+                  plot_bgcolor='#1E1E1E',
+                  autosize=False,
+                  width=900,
+                  height=800)
+fig.update_xaxes(dtick=60*60*6*1000, 
+                 tickformat='%-I%p\n%a %-m/%-d/%Y',
+                 showgrid=True)
 
 def weatherplot():
     fig_weather = px.line(foredf, x='time', y='tdry', 
@@ -56,7 +66,7 @@ def weatherplot():
                             showgrid=True)
 
 app.layout = html.Div(children=[
-    html.H3(children='Climate Cab'),
+    html.H1(children='Climate Cab'),
 
     html.H5(children='Weather-informed decision making for taxi drivers.'),
 

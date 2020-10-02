@@ -155,43 +155,26 @@ def write_table(hist, verb = False):
     print('Table written:', showtime())
 
 
-def showtime():
-    """Return current time as string."""
-    now = datetime.now()
-    now_str = now.strftime("%H:%M:%S")
-    return now_str
+def data_processing():
+    # set configuration and suppress info messages
+    conf = SparkConf() \
+        .set('spark.serializer', 'org.apache.spark.serializer.KryoSerializer') \
+        .set('spark.executor.memory', '2048m') \
+        .set('spark.executor.cores', 2) \
+        .set('spark.sql.files.maxPartitionBytes', 512*1024*1024) \
+        .set('spark.sql.shuffle.partitions', 64)
+    sc = SparkContext(conf=conf)
+    sc.setLogLevel("ERROR")
+    # start a spark session
+    spark = SparkSession.builder.appName('cabhistory').getOrCreate()
 
+    verb = False
+    years = ['13', '14', '15', '16', '17', '18', '19']
+    cabs = make_cab_table(years, verb)
+    wthr = make_weather_table(years, verb)
+    combo = join_cabs_and_wthr(cabs, wthr, verb)
+    hist = aggregate_combo(combo, verb)
+    write_table(hist)
 
-# save start time
-start = showtime()
-start_time = datetime.now()
-# set configuratin and suppress info messages
-conf = SparkConf() \
-    .set('spark.serializer', 'org.apache.spark.serializer.KryoSerializer') \
-    .set('spark.executor.memory', '2048m') \
-    .set('spark.executor.cores', 2) \
-    .set('spark.sql.files.maxPartitionBytes', 512*1024*1024) \
-    .set('spark.sql.shuffle.partitions', 64)
-sc = SparkContext(conf=conf)
-sc.setLogLevel("ERROR")
-# start a spark session
-spark = SparkSession.builder.appName('cabhistory').getOrCreate()
-
-print('Script started at:', start)
-verb = False
-years = ['13', '14', '15', '16', '17', '18', '19']
-cabs = make_cab_table(years, verb)
-print('Cab ingestion done:', showtime())
-wthr = make_weather_table(years, verb)
-print('Weather ingestion done:', showtime())
-combo = join_cabs_and_wthr(cabs, wthr, verb)
-print('Cab-weather join done:', showtime())
-hist = aggregate_combo(combo, verb)
-print('Historical table done:', showtime())
-write_table(hist)
-#hist.explain(True)
-finish_time = datetime.now()
-print('Script finished:', showtime())
-delta_str = str(finish_time - start_time)
-print('Total run time:', delta_str)
-time.sleep(60)
+if __name__ == '__main__':
+    data_processing()
