@@ -78,7 +78,7 @@ def make_weather_table(years, verb = False):
     """ Create dataframe of weather data.
 
     Round hourly temp to nearest 10 def F
-    Ceil hourly precipitation to nearest 0.2 in
+    Divide rainfall into none, light (<=0.2 in), and heavy bins
     Round timestamp to nearest hour
     """
 
@@ -104,7 +104,9 @@ def make_weather_table(years, verb = False):
         .fillna({'precip':0})
     wthr = wthr \
         .withColumn('trnd', sf.round(wthr.tdry/10)*10) \
-        .withColumn('prnd', sf.ceil(wthr.precip*5)/5) \
+        .withColumn('prnd', sf.when(wthr.precip == 0, 0) \
+                              .when(wthr.precip.between(0,0.2), 0.2) \
+                              .otherwise(1)) \
         .withColumn('timernd', sf.date_trunc("Hour", wthr.date)) \
         .withColumn('day', (sf.date_format(wthr.date, 'u')).cast('int')) \
         .withColumn('hour', sf.hour(wthr.date)) \
@@ -165,10 +167,10 @@ def showtime():
 # save start time
 start = showtime()
 start_time = datetime.now()
-# set configuratin and suppress info messages
+# set configuration and suppress info messages
 conf = SparkConf() \
     .set('spark.serializer', 'org.apache.spark.serializer.KryoSerializer') \
-    .set('spark.executor.memory', '2048m') \
+    .set('spark.executor.memory', '2g') \
     .set('spark.executor.cores', 2) \
     .set('spark.sql.files.maxPartitionBytes', 512*1024*1024) \
     .set('spark.sql.shuffle.partitions', 64)
@@ -180,6 +182,7 @@ spark = SparkSession.builder.appName('cabhistory').getOrCreate()
 print('Script started at:', start)
 verb = False
 years = ['13', '14', '15', '16', '17', '18', '19']
+#years = ['19']
 cabs = make_cab_table(years, verb)
 print('Cab ingestion done:', showtime())
 wthr = make_weather_table(years, verb)
