@@ -102,6 +102,7 @@ app = dash.Dash(__name__)
 
 app.layout = html.Div([
     html.H1('Climate Cab'),
+    html.Span(className="sub", children='Subtitle'),
     html.H5('Weather-informed decision making for taxi drivers.'),
     dcc.Tabs([
         dcc.Tab(label='City Overview', children=[

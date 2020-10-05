@@ -18,16 +18,17 @@ from pyspark.sql import SparkSession
 import pyspark.sql.functions as sf
 from datetime import datetime
 from pyspark.sql.types import StructType
+from pyspark.sql.utils import AnalysisException
 
 
 def persist_cabs(cabs, verb=False):
+    """Filter, calculate columns, partition on start time and cache cab df."""
     
     cabs = cabs \
         .filter(cabs.trip_tot < 500) \
         .select(['taxi', 'start_str', 'comm_pick', 'dur', 
                  'dist', 'fare', 'tip', 'extra']) \
-        .fillna(0, subset=['fare', 'tip', 'extra', 'dur', 'dist']) 
-        #.fillna(1, subset=['dur', 'dist'])
+        .fillna(0, subset=['fare', 'tip', 'extra', 'dur', 'dist'])
     cabs = cabs \
         .withColumn('startrnd', sf.date_trunc("Hour", 
             sf.to_timestamp(cabs.start_str, 'MM/dd/yyyy hh:mm:ss aa'))) \
@@ -35,49 +36,44 @@ def persist_cabs(cabs, verb=False):
         .drop('start_str', 'fare', 'tip', 'extra')
     cabs = cabs \
         .withColumn('permile', 
-            sf.when(cabs.dist > 0.2, sf.least(cabs.total / cabs.dist, sf.lit(50))) \
-                .otherwise(sf.lit(2.5))) \
+            sf.when(cabs.dist > 0.2, sf.least(cabs.total / cabs.dist, sf.lit(20))) \
+              .otherwise(sf.lit(4))) \
         .withColumn('permin', 
-            sf.when(cabs.dur.isNull(), cabs.dur) \
-                .otherwise(sf.least(cabs.total / (cabs.dur/60), sf.lit(200))))
-        #.drop('dur', 'dist')
-
+            sf.when(cabs.dur > 1, sf.least(cabs.total / (cabs.dur/60), sf.lit(5))) \
+              .otherwise(sf.lit(1))) \
+        .drop('dur', 'dist')
 
     cabs = cabs.repartition(64, 'startrnd').cache()
-    if verb: cabs.sort('permile', ascending=False).show()
+    #cabs = cabs.cache()
+    if verb: cabs.show(50)
     return cabs
-
-    cab_agg(cabs, ['startrnd', 'comm_pick'], True)
-    cab_agg(cabs, ['startrnd'], True)
     
 
-def cab_agg(cabs, cols, verb=False):
+def aggregate_cabs(cabs, cols, verb=False):
+    """Calculate aggregate cab metrics."""
+
     cab_agg = cabs \
         .groupBy(cols) \
         .agg(sf.countDistinct('taxi').alias('taxis'),
              sf.sum('total').alias('sum_fares'),
              sf.mean('permile').alias('avg_permile'),
              sf.mean('permin').alias('avg_permin'),
-             sf.mean('dur').alias('avg_dur'),
-             sf.mean('dist').alias('avg_dist'),
-             sf.max('permin').alias('max_permin'),
              sf.count(sf.lit(1)).alias('rides'))
     cab_agg = cab_agg \
         .withColumn('d_hr_cab', cab_agg.sum_fares/cab_agg.taxis)
 
-    if verb: cab_agg.show()
+    if verb: cab_agg.show(50)
     if verb: print('City aggregation:', showtime())
+    return cab_agg
 
 
-def make_weather_table(wthr, verb = False):
-    """ Create dataframe of weather data.
+def persist_weather(wthr, verb = False):
+    """ Create and cache dataframe of weather data.
 
     Round hourly temp to nearest 10 def F
     Divide rainfall into none, light (<=0.2 in), and heavy bins
     Round timestamp to nearest hour
     """
-
-    if verb: print('Weather data table has', wthr.count(), 'rows.')
 
     wthr = wthr \
         .select('date', 'tdry', 'precip') \
@@ -93,23 +89,30 @@ def make_weather_table(wthr, verb = False):
         .withColumn('day', (sf.date_format(wthr.date, 'u')).cast('int')) \
         .withColumn('hour', sf.hour(wthr.date)) \
         .drop('tdry', 'precip', 'date')
-    if verb: wthr.printSchema()
-    if verb: print(wthr.sort('tdry', ascending = False).head(5))
+
+    wthr = wthr.cache()
+
+    if verb: print(wthr.sort('tdry', ascending = False).show(5))
     return wthr
 
 
-def join_cabs_and_wthr(cabs, wthr, verb = False):
-    """ Return joined dataframe with cab and weather data."""
-    combo = cabs.join(sf.broadcast(wthr), cabs.startrnd == wthr.timernd) \
+def agg_cabs_and_wthr(cabs, wthr, verb = False):
+    """ Return joined, aggregated dataframe with cab and weather data."""
+    
+    combo = cabs \
+        .join(sf.broadcast(wthr), cabs.startrnd == wthr.timernd) \
         .drop('startrnd', 'timernd')
-    if verb: print(combo.sort('trnd', ascending = False).head(5))
-    return combo
+    if verb: print(combo.sort('trnd', ascending = False).show(5))
 
+    # check for comm_pick column and group accordingly
+    try:
+        combo['comm_pick']
+        group = ['trnd', 'prnd', 'day', 'hour', 'comm_pick']
+    except AnalysisException:
+        group = ['trnd', 'prnd', 'day', 'hour']
 
-def aggregate_combo(combo, verb = False):
-    """Return aggregated history table."""
     hist = combo \
-        .groupBy('trnd', 'prnd', 'day', 'hour') \
+        .groupBy(group) \
         .agg(sf.mean('taxis').alias('taxis'),
             sf.mean('d_hr_cab').alias('d_hr_cab'),
             sf.mean('avg_permile').alias('d_mile'),
@@ -136,22 +139,36 @@ if __name__ == '__main__':
     spark = SparkSession \
         .builder \
         .appName('cabhistory') \
-        .enableHiveSupport() \
         .getOrCreate()
 
     print('Script started at:', start)
-    verb = True
+    verb = False
     #years = ['13', '14', '15', '16', '17', '18', '19']
-    years = ['13']
+    years = ['13', '14', '15']
     cabs = persist_cabs(read_cabs(spark, years), verb)
-    #cabs = make_cab_table(read_cabs(spark, years), verb)
-    #wthr = make_weather_table(read_wthr(years), verb)
-    #combo = join_cabs_and_wthr(cabs, wthr, verb)
-    #hist = aggregate_combo(combo, verb)
-    #write_table(hist, 'cabhistory')
-    #hist.explain(True)
+    #cabs = cabs.persist()
+    #cabs.explain()
+    wthr = persist_weather(read_wthr(spark, years), verb)
+    #wthr.explain()
+
+    # save summary table for community areas
+    cabs_area = aggregate_cabs(cabs, ['startrnd', 'comm_pick'], verb)
+    hist_area = agg_cabs_and_wthr(cabs_area, wthr, verb)
+    print(hist_area.collect()[:5])
+    #write_table(hist_area, 'areahistory')
+    print('Area table written:', showtime())
+    #hist_area.explain()
+
+    # save summary table for whole city
+    cabs_city = aggregate_cabs(cabs, ['startrnd'], verb)
+    hist_city = agg_cabs_and_wthr(cabs_city, wthr, verb)
+    print(hist_city.collect()[:5])
+    #write_table(hist_city, 'cityhistory')
+    print('City table written:', showtime())
+    #hist_city.explain()
+
     finish_time = datetime.now()
     print('Script finished:', showtime())
     delta_str = str(finish_time - start_time)
     print('Total run time:', delta_str)
-    #inp = input('Press enter to continue.')
+    inp = input('Type enter to continue.')
