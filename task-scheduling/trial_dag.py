@@ -18,27 +18,32 @@ config = read_config()
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2020,10,1),
-    #'email': [config['email']],
-    'email_on_failure': False,
+    'start_date': datetime(2020,10,7),
+    'email': [config['email']],
+    'email_on_failure': True,
     'email_on_retry': False,
     'retries': 3,
     'retry_delay': timedelta(minutes=1)
 }
 
 dag = DAG(
-    dag_id = 'climate_cab_dag',
-    description = 'Airflow DAG to update cab forecast and dashboard.',
+    dag_id = 'trial_dag',
+    description = 'Test DAG to try out changes.',
     schedule_interval = timedelta(minutes=15),
     default_args = default_args
 )
 
-forecast = BashOperator(
-    task_id = 'update_forecast',
-    bash_command = 'python3 /home/ubuntu/code/owm-data.py',
-    #bash_command = 'date',
+showtime = BashOperator(
+    task_id = 'show_time',
+    bash_command = 'date',
     dag = dag 
 )
 
+failtask = BashOperator(
+    task_id = 'this_fails',
+    bash_command = 'c',
+    dag = dag
+)
+
 # setting dependencies
-forecast
+showtime

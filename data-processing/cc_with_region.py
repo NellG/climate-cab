@@ -8,7 +8,6 @@
 # --conf spark.executor.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4=true
 # --conf spark.driver.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4=true
 # --master spark://10.0.0.14:7077 spark.py
-import ast
 import csv
 import time
 from spark_functions import *
@@ -46,7 +45,7 @@ def persist_cabs(cabs, verb=False):
 
     cabs = cabs.repartition(200, 'startrnd') \
         .persist(StorageLevel.MEMORY_AND_DISK_SER)
-    #cabs = cabs.cache()
+    #cabs = cabs.persist(StorageLevel.MEMORY_AND_DISK_SER)
     if verb: cabs.show(50)
     return cabs
     
@@ -137,7 +136,7 @@ if __name__ == '__main__':
         .set('spark.executor.memory', '2g') \
         .set('spark.executor.cores', 2) \
         .set('spark.sql.files.maxPartitionBytes', 128*1024*1024) \
-        .set('spark.sql.shuffle.partitions', 64)
+        .set('spark.sql.shuffle.partitions', 200)
     sc = SparkContext(conf=conf)
     sc.setLogLevel("ERROR")
     # start a spark session
@@ -149,7 +148,7 @@ if __name__ == '__main__':
     print('Script started at:', start)
     verb = False
     years = ['13', '14', '15', '16', '17', '18', '19']
-    #years = ['13', '14', '15']
+    #years = ['13']
     cabs = persist_cabs(read_cabs(spark, years), verb)
     #cabs = cabs.persist()
     #cabs.explain()
@@ -159,16 +158,18 @@ if __name__ == '__main__':
     # save summary table for community areas
     cabs_area = aggregate_cabs(cabs, ['startrnd', 'comm_pick'], verb)
     hist_area = agg_cabs_and_wthr(cabs_area, wthr, verb)
-    print(hist_area.collect()[:5])
-    #write_table(hist_area, 'areahistory')
+    #hist_area.printSchema()
+    #print(hist_area.collect()[:5])
+    write_table(hist_area, 'areahistory')
     print('Area table written:', showtime())
     #hist_area.explain()
 
     # save summary table for whole city
     cabs_city = aggregate_cabs(cabs, ['startrnd'], verb)
     hist_city = agg_cabs_and_wthr(cabs_city, wthr, verb)
-    print(hist_city.collect()[:5])
-    #write_table(hist_city, 'cityhistory')
+    #hist_city.printSchema()
+    #print(hist_city.collect()[:5])
+    write_table(hist_city, 'cityhistory')
     print('City table written:', showtime())
     #hist_city.explain()
 
@@ -176,4 +177,5 @@ if __name__ == '__main__':
     print('Script finished:', showtime())
     delta_str = str(finish_time - start_time)
     print('Total run time:', delta_str)
-    inp = input('Type enter to continue.')
+    print('Completed successfully.')
+    time.sleep(30)

@@ -13,6 +13,23 @@ import requests
 import csv
 
 
+def read_config(filename):
+    """Read config file and return dict."""
+    with open(filename) as infile:
+        reader = csv.reader(infile)
+        config = {row[0]: row[1] for row in reader}
+    return config
+
+
+def connect_postgres(config):
+    """Connect to PostgreSQL and return connection."""
+    pgconnect = psycopg2.connect(\
+        host = config['pghost'], \
+        port = config['pgport'],
+        database = config['database'],
+        user = config['pguser'],
+        password = config['pgpassword'])
+    return pgconnect
 
 
 def get_pg_data(cursor, table):
@@ -29,19 +46,11 @@ def get_pg_data(cursor, table):
 
 
 # Read in Open Weather Map config file
-configfile = '.plotly-config'
-with open(configfile, 'r') as f:
-    config = ast.literal_eval(f.read())
+config = read_config('/home/ubuntu/code/.plotly-config.csv')
 
-# Connect to postgreSQL database
-pgconnect = psycopg2.connect(\
-    host = config['pghost'], \
-    port = config['pgport'],
-    database = config['database'],
-    user = config['pguser'],
-    password = config['pgpassword'])
+# Connect to postgreSQL database and get city data
+pgconnect = connect_postgres(config)
 pgcursor = pgconnect.cursor()
-
 foredf = get_pg_data(pgcursor, 'city_forecast')
 
 # Create 4-row figure showing overall city statistics

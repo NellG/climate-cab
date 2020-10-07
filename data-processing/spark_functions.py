@@ -1,4 +1,3 @@
-import ast
 import csv
 import time
 from pyspark import SparkContext
@@ -28,9 +27,9 @@ def make_schema(schema_file):
 def write_table(df, table, verb = False):
     """Write history table to postgresql database."""
 
-    configfile = '/home/ubuntu/code/.spark-config'
-    with open(configfile, 'r') as f:
-        config = ast.literal_eval(f.read())
+    with open('/home/ubuntu/code/.spark-config.csv') as infile:
+        reader = csv.reader(infile)
+        config = {row[0]: row[1] for row in reader}
     dburl = config['dburl']
     user = config['user']
     password = config['password']
@@ -57,6 +56,32 @@ def read_cabs(spark, years):
     return cabs
 
 
+def read_cabs_nosch(spark, years):
+
+    cabfiles = ['chi_20'+n+'.csv' for n in years]
+    cabbucket = 's3a://chi-cab-bucket/taxi/'
+    cabpaths = [cabbucket + f for f in cabfiles]
+
+    cabs = spark.read \
+        .option('header', True) \
+        .csv(cabpaths)
+
+    cab_cols = [#('Trip ID', 'trip', 'string'),
+                ('Taxi ID', 'taxi', 'string'),
+                ('Trip Start Timestamp', 'start_str', 'string'),
+                ('Pickup Community Area', 'comm_pick', 'string'),
+                ('Trip Seconds', 'dur', 'float'),
+                ('Trip Miles', 'dist', 'float'),
+                ('Fare', 'fare', 'float'),
+                ('Tips', 'tip', 'float'),
+                ('Extras', 'extra', 'float'),
+                ('Trip Total', 'trip_tot', 'float')]
+    cabs = cabs \
+        .select([sf.col(c).alias(n).cast(t) for (c, n, t) in cab_cols])
+    cabs.printSchema
+
+    return cabs
+
 def read_wthr(spark, years):
     """Read weather data into dataFrame."""
 
@@ -69,6 +94,27 @@ def read_wthr(spark, years):
         .csv(wthrpaths)
     
     return wthr
+
+
+def read_wthr_nosch(spark, years):
+    wthrfiles = ['chi-weather_20'+n+'.csv' for n in years]
+    wthrbucket = 's3a://chi-cab-bucket/weather/'
+    wthrpaths = [wthrbucket + f for f in wthrfiles]
+    wthr = spark.read \
+        .option('header', True) \
+        .csv(wthrpaths)
+
+    wthr_cols = [#('STATION', 'station', 'string'), 
+                 ('DATE', 'date', 'timestamp'),
+                 ('HourlyDryBulbTemperature', 'tdry','float'),
+                 ('HourlyPrecipitation', 'precip', 'float'), 
+                 ('STATION', 'station', 'string'), 
+                 ('REPORT_TYPE2', 'report', 'string')]
+    wthr = wthr \
+        .select([sf.col(c).alias(n).cast(t) for (c, n, t) in wthr_cols])
+
+    return wthr
+
 
 def cab_sums(cabs, show_rows=True, show_agg=True):
     """Total rides, fares and unique taxis."""
