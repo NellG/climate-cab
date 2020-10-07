@@ -1,4 +1,3 @@
-import ast
 import json
 import requests
 from datetime import datetime
@@ -6,22 +5,26 @@ import math
 import psycopg2
 import pandas as pd
 import numpy as np
-
-
-def calculate_criteria(df):
-    """Calculate join criterion for as-of join."""
-    df['crit'] = df['hour']*10000 + df['day']*1000 + df['trnd'] + df['prnd']/10
-    df.loc[df['prnd'] > 0, 'crit'] = -1*df.loc[df['prnd'] > 0, 'crit']
-    df.drop(['hour', 'day', 'prnd', 'trnd'], axis=1, inplace=True)
-    df.sort_values('crit', inplace=True)
+import csv
 
 
 def read_config():
     """Read config file and return dict."""
-    configfile = '/home/ubuntu/code/.owm-config'
-    with open(configfile, 'r') as f:
-        config = ast.literal_eval(f.read())
+    with open('/home/ubuntu/code/.owm-config.csv') as infile:
+        reader = csv.reader(infile)
+        config = {row[0]: row[1] for row in reader}
     return config
+
+
+def connect_postgres(config):
+    """Connect to PostgreSQL and return connection."""
+    pgconnect = psycopg2.connect(\
+        host = config['pghost'], \
+        port = config['pgport'],
+        database = config['database'],
+        user = config['pguser'],
+        password = config['pgpassword'])
+    return pgconnect
 
 
 def get_weather(config):
@@ -52,18 +55,15 @@ def get_weather(config):
     return foredf
 
 
-def connect_postgres():
-    """Connect to PostgreSQL and return connection."""
-    pgconnect = psycopg2.connect(\
-        host = config['pghost'], \
-        port = config['pgport'],
-        database = config['database'],
-        user = config['pguser'],
-        password = config['pgpassword'])
-    return pgconnect
+def calculate_criteria(df):
+    """Calculate join criterion for as-of join."""
+    df['crit'] = df['hour']*10000 + df['day']*1000 + df['trnd'] + df['prnd']/10
+    df.loc[df['prnd'] > 0, 'crit'] = -1*df.loc[df['prnd'] > 0, 'crit']
+    df.drop(['hour', 'day', 'prnd', 'trnd'], axis=1, inplace=True)
+    df.sort_values('crit', inplace=True)
 
 
-def get_history_data(table, d_min=1, d_max=7, t_min=-100, t_max=200):
+def get_history_data(pgcursor, table, d_min=1, d_max=7, t_min=-100, t_max=200):
     """Get history data from postgresql database."""
     col_str = "SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE "
     col_str += "TABLE_NAME = '" + table + "';"
@@ -89,7 +89,7 @@ def join_tables(histdf, foredf):
     return joindf
 
 
-def save_table(table, df):
+def save_table(pgcursor, table, df):
     """Clear existing data and insert data from df."""
     clr_str = "TRUNCATE TABLE " + table + ";"
     pgcursor.execute(clr_str)
@@ -106,15 +106,16 @@ def save_table(table, df):
             + values[:-2] + ');'
     for row in df.values.tolist():
         pgcursor.execute(sql_str, row)
-    pgconnect.commit()
 
 
-if __name__ == '__main__':
-    
+def update_forecast():
+    """Update cab forecast and save in postgreSQL."""
+
+    print("I'm running.")
     # read config file for Open Weather API and
     # postres db, connect to db
     config = read_config()
-    pgconnect = connect_postgres()
+    pgconnect = connect_postgres(config)
     pgcursor = pgconnect.cursor()
     
     # assemble weather forecast dataframe
@@ -126,13 +127,13 @@ if __name__ == '__main__':
     calculate_criteria(foredf)
 
     # assemble and save city-level cab forecast
-    citydf = get_history_data('cityhistory', d_min, d_max, t_min, t_max)
+    citydf = get_history_data(pgcursor, 'cityhistory', d_min, d_max, t_min, t_max)
     calculate_criteria(citydf)
     citypred = join_tables(citydf, foredf)
-    save_table('city_forecast', citypred)
+    save_table(pgcursor, 'city_forecast', citypred)
 
     # assemble and save community area-level cab forecast
-    areadf = get_history_data('areahistory', d_min, d_max, t_min, t_max)
+    areadf = get_history_data(pgcursor, 'areahistory', d_min, d_max, t_min, t_max)
     calculate_criteria(areadf)
     areadf['comm_pick'] = pd.to_numeric(areadf['comm_pick'])
     a_min = int(min(areadf['comm_pick']))
@@ -142,4 +143,10 @@ if __name__ == '__main__':
         adder = join_tables(areadf[areadf['comm_pick'] == area+1], foredf)
         areapred = areapred.append(adder, ignore_index=True)
     # Scale factor for regional $/cab/hr: 1.39
-    save_table('area_forecast', areapred)
+    save_table(pgcursor, 'area_forecast', areapred)
+    pgconnect.commit()
+
+    print("I'm done running.")
+
+if __name__ == '__main__':
+    update_forecast()

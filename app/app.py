@@ -13,8 +13,23 @@ import requests
 import csv
 
 
+
+
+def get_pg_data(cursor, table):
+    """Get data from table in postgresql database."""
+    col_str = "SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE "
+    col_str += "TABLE_NAME = '" + table + "';"
+    cursor.execute(col_str)
+    col_names = pd.DataFrame(cursor.fetchall())
+
+    sql_str = "SELECT * FROM " + table + ";"
+    cursor.execute(sql_str)
+    df = pd.DataFrame(cursor.fetchall(), columns=col_names[0].values)
+    return df
+
+
 # Read in Open Weather Map config file
-configfile = '/home/ubuntu/code/.plotly-config'
+configfile = '.plotly-config'
 with open(configfile, 'r') as f:
     config = ast.literal_eval(f.read())
 
@@ -27,11 +42,7 @@ pgconnect = psycopg2.connect(\
     password = config['pgpassword'])
 pgcursor = pgconnect.cursor()
 
-# Download forecast data table
-pgcursor.execute("SELECT * FROM cabforecast")
-foredf = pd.DataFrame(pgcursor.fetchall(),
-    columns=['time', 'tdry', 'precip', 'crit', 'taxis', 
-             'd_hr_cab', 'd_mile', 'd_min', 'avg_over'])
+foredf = get_pg_data(pgcursor, 'city_forecast')
 
 # Create 4-row figure showing overall city statistics
 fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
@@ -61,48 +72,34 @@ fig.update_yaxes(rangemode='tozero')
 fips_file = 'data/Boundaries.geojson'
 with open(fips_file, 'r') as f:
     areas = json.loads(f.read())
-#print(areas['features'][0]['properties'])
+area_df = get_pg_data(pgcursor, 'area_forecast')
+plot_time = min(area_df['time'])
+idle = 20
+#area_df['d_hr_cab'] = area_df['d_ride']*60/(idle+area_df['d_ride']/area_df['d_min'])
+area_df['d_hr_cab'] = area_df['d_ride'] * 60/(idle + area_df['d_ride']/area_df['d_min'])
 
-comm_file = 'data/community_data.csv'
-commdf = pd.read_csv(comm_file, dtype={'fips':str})
-#print(commdf.head(5))
-
-mfig = px.choropleth_mapbox(commdf, 
+mfig = px.choropleth_mapbox(area_df[area_df['time'] == plot_time], 
                             geojson=areas, 
-                            locations='fips', 
+                            locations='comm_pick', 
                             featureidkey='properties.area_numbe',
-                            color='value',
+                            color='d_mile',
                             color_continuous_scale='Viridis',
-                            range_color=(0, 80),
+                            range_color=(2, 12),
                             mapbox_style='carto-positron',
                             zoom=10,
                             center={'lat':41.84, 'lon':-87.7},
                             opacity=0.5,
-                            labels={'unemp':'Unemployment Rate'})
+                            labels={'d_hr_cab':'$/hr/cab'})
 mfig.update_layout(margin={'r': 0, 't': 0, 'l': 0, 'b': 0},
                    autosize=False,
                    width=900,
                    height=800)
 
-def weatherplot():
-    fig_weather = px.line(foredf, x='time', y='tdry', 
-                        color=px.Constant('Temperature, F'),
-                        labels=dict(time='', tdry='', color=''))
-    fig_weather.add_bar(x=foredf['time'], 
-                        y=foredf['precip']*100, name='Precipitation, 100ths of in')
-    fig_weather.update_xaxes(dtick=21600000, tickformat='%-I%p\n%-m/%-d/%Y', 
-                            showgrid=True)
 
-
-#external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-external_stylesheets = ['https://github.com/NellG/climate-cab/blob/master/app/style.css']
-
-#app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
     html.H1('Climate Cab'),
-    html.Span(className="sub", children='Subtitle'),
     html.H5('Weather-informed decision making for taxi drivers.'),
     dcc.Tabs([
         dcc.Tab(label='City Overview', children=[

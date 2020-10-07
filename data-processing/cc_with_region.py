@@ -14,6 +14,7 @@ import time
 from spark_functions import *
 from pyspark import SparkContext
 from pyspark import SparkConf
+from pyspark import StorageLevel
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as sf
 from datetime import datetime
@@ -43,7 +44,8 @@ def persist_cabs(cabs, verb=False):
               .otherwise(sf.lit(1))) \
         .drop('dur', 'dist')
 
-    cabs = cabs.repartition(64, 'startrnd').cache()
+    cabs = cabs.repartition(200, 'startrnd') \
+        .persist(StorageLevel.MEMORY_AND_DISK_SER)
     #cabs = cabs.cache()
     if verb: cabs.show(50)
     return cabs
@@ -60,7 +62,8 @@ def aggregate_cabs(cabs, cols, verb=False):
              sf.mean('permin').alias('avg_permin'),
              sf.count(sf.lit(1)).alias('rides'))
     cab_agg = cab_agg \
-        .withColumn('d_hr_cab', cab_agg.sum_fares/cab_agg.taxis)
+        .withColumn('d_hr_cab', cab_agg.sum_fares/cab_agg.taxis) \
+        .withColumn('avg_perride', cab_agg.sum_fares/cab_agg.rides)
 
     if verb: cab_agg.show(50)
     if verb: print('City aggregation:', showtime())
@@ -117,6 +120,8 @@ def agg_cabs_and_wthr(cabs, wthr, verb = False):
             sf.mean('d_hr_cab').alias('d_hr_cab'),
             sf.mean('avg_permile').alias('d_mile'),
             sf.mean('avg_permin').alias('d_min'),
+            sf.mean('rides').alias('rides'),
+            sf.mean('avg_perride').alias('d_ride'),
             sf.count(sf.lit(1)).alias('avged_over'))
     if verb: print('Historical data table has', hist.count(), 'rows.')
     return hist
@@ -131,7 +136,7 @@ if __name__ == '__main__':
         .set('spark.serializer', 'org.apache.spark.serializer.KryoSerializer') \
         .set('spark.executor.memory', '2g') \
         .set('spark.executor.cores', 2) \
-        .set('spark.sql.files.maxPartitionBytes', 512*1024*1024) \
+        .set('spark.sql.files.maxPartitionBytes', 128*1024*1024) \
         .set('spark.sql.shuffle.partitions', 64)
     sc = SparkContext(conf=conf)
     sc.setLogLevel("ERROR")
@@ -143,8 +148,8 @@ if __name__ == '__main__':
 
     print('Script started at:', start)
     verb = False
-    #years = ['13', '14', '15', '16', '17', '18', '19']
-    years = ['13', '14', '15']
+    years = ['13', '14', '15', '16', '17', '18', '19']
+    #years = ['13', '14', '15']
     cabs = persist_cabs(read_cabs(spark, years), verb)
     #cabs = cabs.persist()
     #cabs.explain()

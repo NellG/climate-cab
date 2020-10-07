@@ -26,7 +26,7 @@ def make_schema(schema_file):
     return schema
 
 def write_table(df, table, verb = False):
-    """Write history table ot postgresql database."""
+    """Write history table to postgresql database."""
 
     configfile = '/home/ubuntu/code/.spark-config'
     with open(configfile, 'r') as f:
