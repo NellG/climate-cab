@@ -145,6 +145,8 @@ def update_forecast():
     # Scale factor for regional $/cab/hr: 1.39
     save_table(pgcursor, 'area_forecast', areapred)
     pgconnect.commit()
+    pgcursor.close()
+    pgconnect.close()
 
     print("I'm done running.")
 
