@@ -1,6 +1,7 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import dash_daq as daq
 from dash.dependencies import Input, Output
 import plotly.express as px
 import plotly.graph_objects as go
@@ -56,17 +57,12 @@ def get_all_tables(config):
     return city_df, area_df
 
 
-def slider_marks(df):
+def list_times(df):
     """Define dict for slider tick mark labels."""
     ticks = {}
     start_hr = df.loc[0, 'time'].hour
     for i in df.index:
-        if (i + start_hr) % 24 == 0:
-            ticks[i] = (df.loc[i, 'time']).strftime('%a %-I %p')
-        elif (i + start_hr) % 6 == 0:
-            ticks[i] = (df.loc[i, 'time']).strftime('%-I %p')
-        else:
-            ticks[i] = ''
+        ticks[i] = (df.loc[i, 'time']).strftime('%a %-I %p')
     ticks[0] = 'now'
     return ticks
 
@@ -74,7 +70,7 @@ def slider_marks(df):
 def make_city_chart(city_df):
     """Plot overall city data."""
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
-                        vertical_spacing=0.04)
+                        vertical_spacing=0.025)
     fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['tdry'], name='Temperature, F'),
                 row=1, col=1)
     fig.add_bar(x=city_df['time'], y=city_df['precip']*100,
@@ -86,11 +82,8 @@ def make_city_chart(city_df):
     fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_mile'], name='$/mile'),
                 row=4, col=1)
     fig.update_layout(template='plotly_dark',
-                    paper_bgcolor='#1E1E1E', 
-                    plot_bgcolor='#1E1E1E',
-                    autosize=False,
-                    width=900,
-                    height=800)
+                    paper_bgcolor='#242424', 
+                    plot_bgcolor='#242424')
     fig.update_xaxes(dtick=60*60*6*1000, 
                     tickformat='%-I%p\n%a %-m/%-d/%Y',
                     showgrid=True)
@@ -119,10 +112,7 @@ def make_area_map(area_df, time_slider, map_metric):
                                 center={'lat':41.84, 'lon':-87.7},
                                 opacity=0.5,
                                 labels={'d_hr_cab':'$/hr/cab'})
-    mfig.update_layout(margin={'r': 0, 't': 0, 'l': 0, 'b': 0},
-                    autosize=False,
-                    width=900,
-                    height=800)
+    mfig.update_layout(margin={'r': 10, 't': 10, 'l': 10, 'b': 10})
 
     return mfig
 
@@ -147,54 +137,67 @@ area_map = make_area_map(area_df, min(city_df['time']), 'rides')
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
-    html.H2('Taximizer'),
-    html.H4('Forecasting taxi income in Chicago.'),
-    html.Br(),
-    html.Div('Select time and metric to show on map.'),
-    html.Br(),
-    dcc.Slider(
-        id='time-slider',
-        updatemode='mouseup',
-        min=0,
-        max=47,
-        value=0,
-        marks=slider_marks(city_df),
-        step=1,
-        included=False
+    html.Div(
+        id="left-column",
+        className="four columns",
+        children=[
+            html.H2('Taximizer'),
+            html.H4('Forecasting taxi income in Chicago.'),
+            html.Br(),
+            html.Div('Select time point and metric to show on map.'),
+            html.Br(),
+            dcc.Dropdown(
+                id='time-drop',
+                options=[{'label': list_times(city_df)[i],
+                          'value': i} for i in list_times(city_df)],
+                value=0,
+                style={'color':'#1e1e1e'}
+            ),
+            html.Br(),
+            dcc.RadioItems(
+                id='metric-radio',
+                options=[{'label': area_cols[i], 'value': i} for i in area_cols],
+                value='d_mile'
+            )
+        ]
     ),
-    html.Br(),
-    dcc.Dropdown(
-        id='metric-drop',
-        options=[{'label': area_cols[i], 'value': i} for i in area_cols],
-        value='d_mile'
-    ),            
-    html.Br(),
-    dcc.Tabs([
-        dcc.Tab(label='City Overview', children=[
-            dcc.Graph(
-                id='city-forecast',
-                figure=city_fig)
-        ]),  
-        dcc.Tab(label='Region Specific', children=[
+
+    html.Div(
+        id="right-column",
+        className="eight columns",
+        style={'background-color':'#242424'},
+        children=[            
             html.Br(),
-            html.Div(id='map-desc'),
-            html.Br(),
-            dcc.Graph(
-                id='area-map',
-                figure=area_map)
-        ])
-    ]),
-    dcc.Interval(
-        id='interval-counter',
-        interval=15*60*1000, # 15 minutes
-        n_intervals=0
+            dcc.Tabs([
+                dcc.Tab(label='City Overview', children=[
+                    dcc.Graph(
+                        id='city-forecast',
+                        figure=city_fig,
+                        style={'height':'75vh'})
+                ]),  
+                dcc.Tab(label='Region Specific', children=[
+                    html.Br(),
+                    html.Div(id='map-desc'),
+                    html.Br(),
+                    dcc.Graph(
+                        id='area-map',
+                        figure=area_map,
+                        style={'height':'75vh'})
+                ])
+            ]),
+            dcc.Interval(
+                id='interval-counter',
+                interval=15*60*1000, # 15 minutes
+                n_intervals=0
+            )
+        ]
     )
-])
+], className="row")
 
 @app.callback(
     [Output('map-desc', 'children'), Output('area-map', 'figure'),
-     Output('city-forecast', 'figure'), Output('time-slider', 'marks')],
-    [Input('time-slider','value'), Input('metric-drop', 'value'),
+     Output('city-forecast', 'figure'), Output('time-drop', 'marks')],
+    [Input('time-drop','value'), Input('metric-radio', 'value'),
      Input('interval-counter', 'n_intervals')]
 )
 def update_area_map(time_slider, map_metric, n_intervals):
@@ -205,7 +208,7 @@ def update_area_map(time_slider, map_metric, n_intervals):
     city_fig = make_city_chart(city_df)
     area_map = make_area_map(area_df, city_df.loc[time_slider, 'time'], map_metric)
     
-    return text_field, area_map, city_fig, slider_marks(city_df)
+    return text_field, area_map, city_fig, list_times(city_df)
 
 
 if __name__ == '__main__':
