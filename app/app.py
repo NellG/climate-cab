@@ -1,7 +1,6 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_daq as daq
 from dash.dependencies import Input, Output
 import plotly.express as px
 import plotly.graph_objects as go
@@ -82,8 +81,8 @@ def make_city_chart(city_df):
     fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_mile'], name='$/mile'),
                 row=4, col=1)
     fig.update_layout(template='plotly_dark',
-                    paper_bgcolor='#242424', 
-                    plot_bgcolor='#242424')
+                    paper_bgcolor='#1e1e1e', 
+                    plot_bgcolor='#1e1e1e')
     fig.update_xaxes(dtick=60*60*6*1000, 
                     tickformat='%-I%p\n%a %-m/%-d/%Y',
                     showgrid=True)
@@ -139,7 +138,7 @@ app = dash.Dash(__name__)
 app.layout = html.Div([
     html.Div(
         id="left-column",
-        className="four columns",
+        className="three columns",
         children=[
             html.H2('Taximizer'),
             html.H4('Forecasting taxi income in Chicago.'),
@@ -164,27 +163,44 @@ app.layout = html.Div([
 
     html.Div(
         id="right-column",
-        className="eight columns",
-        style={'background-color':'#242424'},
+        className="nine columns",
         children=[            
             html.Br(),
-            dcc.Tabs([
-                dcc.Tab(label='City Overview', children=[
-                    dcc.Graph(
-                        id='city-forecast',
-                        figure=city_fig,
-                        style={'height':'75vh'})
-                ]),  
-                dcc.Tab(label='Region Specific', children=[
-                    html.Br(),
-                    html.Div(id='map-desc'),
-                    html.Br(),
-                    dcc.Graph(
-                        id='area-map',
-                        figure=area_map,
-                        style={'height':'75vh'})
-                ])
-            ]),
+            dcc.Tabs(
+                id='forecast-tabs',
+                value='city-tab',
+                parent_className='custom-tabs',
+                className='custom-tabs-container',
+                children=[
+                    dcc.Tab(
+                        label='City Overview', 
+                        value='city-tab',
+                        className='custom-tab',
+                        selected_className='custom-tab--selected',
+                        children=[
+                        dcc.Graph(
+                            id='city-forecast',
+                            figure=city_fig,
+                            style={'height':'75vh'})
+                        ]
+                    ),  
+                    dcc.Tab(
+                        label='Region Specific',
+                        value='area-tab',
+                        className='custom-tab',
+                        selected_className='custom-tab--selected', 
+                        children=[
+                            html.Br(),
+                            html.Div(id='map-desc'),
+                            html.Br(),
+                            dcc.Graph(
+                                id='area-map',
+                                figure=area_map,
+                                style={'height':'75vh'})
+                        ]
+                    )
+                ]
+            ),
             dcc.Interval(
                 id='interval-counter',
                 interval=15*60*1000, # 15 minutes
