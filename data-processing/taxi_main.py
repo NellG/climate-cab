@@ -1,7 +1,5 @@
-# launch script with:
-# spark-submit --packages com.amazonaws:aws-java-sdk:1.7.4,org.apache.hadoop:hadoop-aws:2.7.7,org.postgresql:postgresql:42.2.16.jre7 --master spark://10.0.0.14:7077 spark.py
-
 import csv
+import boto3
 from pyspark import SparkContext
 from pyspark import SparkConf
 from pyspark import StorageLevel
@@ -22,17 +20,23 @@ def make_schema(schema_file):
     return schema
 
 
-def read_cabs(spark, years):
-    """Read cab data into dataFrame."""
-    cabfiles = ['chi_20'+n+'.csv' for n in years]
-    cabbucket = 's3a://chi-cab-bucket/taxi/'
-    cabpaths = [cabbucket + f for f in cabfiles]
+def read_bucket(spark, bucket, folder):
+    """Read a csv files in bucket/folder into dataFrame."""
+    s3 = boto3.resource('s3')
+    s3_path = 's3a://'+bucket+'/'
+    s3_bucket = s3.Bucket(bucket)
+    schema = folder + '_schema.csv'
+    
+    files = []
+    for obj in s3_bucket.objects.filter(Prefix=folder):
+        if obj.key[-4:] == '.csv':
+            files.append(s3_path + obj.key)
 
-    cabs = spark.read \
+    df = spark.read \
         .option('header', True) \
-        .schema(make_schema('cab_schema.csv')) \
-        .csv(cabpaths)
-    return cabs
+        .schema(make_schema(schema)) \
+        .csv(files)
+    return df
 
 
 def persist_cabs(cabs):
@@ -74,19 +78,6 @@ def aggregate_cabs(cabs, cols):
         .withColumn('d_hr_cab', cab_agg.sum_fares/cab_agg.taxis) \
         .withColumn('avg_perride', cab_agg.sum_fares/cab_agg.rides)
     return cab_agg
-
-
-def read_wthr(spark, years):
-    """Read weather data into dataFrame."""
-    wthrfiles = ['chi-weather_20'+n+'.csv' for n in years]
-    wthrbucket = 's3a://chi-cab-bucket/weather/'
-    wthrpaths = [wthrbucket + f for f in wthrfiles]
-    
-    wthr = spark.read \
-        .option('header', True) \
-        .schema(make_schema('weather_schema.csv')) \
-        .csv(wthrpaths)
-    return wthr
 
 
 def persist_weather(wthr):
@@ -171,10 +162,14 @@ if __name__ == '__main__':
         .appName('cabhistory') \
         .getOrCreate()
 
+    # name of S3 bucket and folders containing data
+    bucket = 'chi-cab-bucket'
+    cab_folder = 'taxi'
+    wthr_folder = 'weather'
+
     # define years of interest and read in data
-    years = ['13', '14', '15', '16', '17', '18', '19']
-    cabs = persist_cabs(read_cabs(spark, years))
-    wthr = persist_weather(read_wthr(spark, years))
+    cabs = persist_cabs(read_bucket(spark, bucket, cab_folder))
+    wthr = persist_weather(read_bucket(spark, bucket, wthr_folder))
 
     # save summary table for community areas
     cabs_area = aggregate_cabs(cabs, ['startrnd', 'comm_pick'])
