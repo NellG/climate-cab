@@ -1,0 +1,67 @@
+/*Tabs*/
+.custom-tabs-container {
+    width: 100%;
+    border-top-left-radius: 3px;
+}
+.custom-tabs {
+    border-top-left-radius: 3px;
+    background-color: #161a28;
+    cursor: pointer;
+    font-size: 1.8rem;
+    height: fit-content;
+}
+
+.custom-tab {
+    color: #d8d8d8;
+    background-color: #161a28 !important;
+    border: #1e2130 solid 2px !important;
+    border-bottom: #1e2130 solid 4px !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    height: fit-content;
+    padding: 12px !important;
+    font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.custom-tab--selected {
+    color: #d8d8d8 !important;
+    border-bottom: #578eb4 solid 4px !important;
+}
+
+/*Dropdown*/
+
+/*background*/
+.Select-control, .Select-multi-value-wrapper, .Select-menu-outer div, .Select-control > span {
+    background-color: #303344;
+}
+
+/*text*/
+.Select-control, .Select, .Select-value-label, .Select-clear-zone, .Select-control > span {
+    color: #d8d8d8;
+}
+
+/*outline*/
+.Select-menu-outer {
+    background-color: #303344;
+    border: 1px solid #d8d8d8;
+}
+
+/*hover*/
+.Select-menu-outer div:hover {
+    background-color: #474b64 !important;
+    cursor: pointer;
+}
+
+/*Placeholder*/
+.Select.has-value.Select--single > .Select-control .Select-value .Select-value-label, .Select.has-value.is-pseudo-focused.Select--single > .Select-control .Select-value .Select-value-label {
+    color: #d8d8d8 !important;
+  }
+  
+  /*Placeholder*/
+  .Select--single > .Select-control .Select-value, .Select-placeholder {
+    background-color: #303344;
+    border: 1px solid #d8d8d8;
+    cursor: pointer;
+  }

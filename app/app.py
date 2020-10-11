@@ -69,30 +69,57 @@ def list_times(df):
 def make_city_chart(city_df):
     """Plot overall city data."""
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
-                        vertical_spacing=0.025)
-    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['tdry'], name='Temperature, F'),
+                        vertical_spacing=0.05)
+    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['tdry'], name='Temperature, F', 
+                             marker=dict(color='#ffff72'),
+                             hovertemplate='%{x|%b %-d, %-I %p}<br>'+
+                                           '%{y:.0f}\u00B0F<extra></extra>'),
                 row=1, col=1)
-    fig.add_bar(x=city_df['time'], y=city_df['precip']*100,
-                row=1, col=1, name='Rain, in x100')
-    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['rides'], name='# Rides/hour'),
+    fig.add_bar(x=city_df['time'], y=city_df['precip']*10, marker=dict(color='#578eb4'),
+                row=1, col=1, name='Rain, in x10', customdata=city_df['precip'].values,
+                hovertemplate='%{x|%b %-d, %-I %p}<br>'+
+                              '%{customdata:.1f} inches<extra></extra>')
+    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['rides'], name='# Rides/hour',
+                             marker=dict(color='#5bdd9f'),
+                             hovertemplate='%{x|%b %-d, %-I %p}<br>'+
+                                           '%{y:.0f} rides/hour<extra></extra>'),
                 row=2, col=1)
-    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_hr_cab'], name='$/hour/cab'),
+    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_hr_cab'], name='$/hour/cab',
+                             marker=dict(color='#578eb4'),
+                             hovertemplate='%{x|%b %-d, %-I %p}<br>'+
+                                           '$%{y:.2f}/hour/cab<extra></extra>'),
                 row=3, col=1)
-    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_mile'], name='$/mile'),
+    fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_mile'], name='$/mile',
+                             marker=dict(color='#914ea1'),
+                             hovertemplate='%{x|%b %-d, %-I%p}<br>'+
+                                           '$%{y:.2f}/mile<extra></extra>'),
                 row=4, col=1)
     fig.update_layout(template='plotly_dark',
-                    paper_bgcolor='#1e1e1e', 
-                    plot_bgcolor='#1e1e1e')
-    fig.update_xaxes(dtick=60*60*6*1000, 
-                    tickformat='%-I%p\n%a %-m/%-d/%Y',
-                    showgrid=True)
-    fig.update_yaxes(rangemode='tozero')
+                    paper_bgcolor='#161a28', 
+                    plot_bgcolor='#161a28', 
+                    margin={'r':15, 't':25, 'l': 80, 'b': 15},
+                    showlegend=False)
+    fig.update_xaxes(dtick=60*60*12*1000, 
+                    tickformat='%-I%p\n%a',
+                    showgrid=True,
+                    color='#d8d8d8')
+    fig.update_yaxes(rangemode='tozero',
+                    color='#d8d8d8')
+    fig.update_yaxes(title_text='T \u00B0F <br> Rain 0.1 in', title_standoff = 7, row=1, col=1)
+    fig.update_yaxes(title_text='# Rides/hour', title_standoff = 0, row=2, col=1)
+    fig.update_yaxes(title_text='$/hour/cab', title_standoff = 14, row=3, col=1)
+    fig.update_yaxes(title_text='$/mile', title_standoff = 21, row=4, col=1)
 
     return fig
 
 
 def make_area_map(area_df, time_slider, map_metric):
     """Plot area specific data in choropleth."""
+    area_df['Metrics'] = '<br>' \
+                    + area_df['d_mile'].map('${:,.2f}/mile<br>'.format) \
+                    + area_df['d_min'].map('${:,.2f}/minute<br>'.format) \
+                    + area_df['d_ride'].map('${:,.2f}/ride<br>'.format) \
+                    + area_df['rides'].map('{:,.0f} rides/hour'.format)
     if map_metric != 'rides':
         c_max = np.ceil(area_df[map_metric].quantile(q=0.95))
         c_min = np.floor(area_df[map_metric].quantile(q=0.05))
@@ -110,9 +137,18 @@ def make_area_map(area_df, time_slider, map_metric):
                                 zoom=10,
                                 center={'lat':41.84, 'lon':-87.7},
                                 opacity=0.5,
-                                labels={'d_hr_cab':'$/hr/cab'})
-    mfig.update_layout(margin={'r': 10, 't': 10, 'l': 10, 'b': 10})
-
+                                labels=area_cols,
+                                hover_data = {'d_min':False,
+                                              'Metrics':True,
+                                              'd_mile':False,
+                                              'rides':False,
+                                              'd_ride':False,
+                                              'comm_pick':False})
+    mfig.update_layout(margin={'r': 15, 't': 15, 'l': 15, 'b': 15},
+                       paper_bgcolor='#161a28',
+                       coloraxis=dict(colorbar=dict(titlefont={'color': '#d8d8d8'},
+                                                    tickfont={'color': '#d8d8d8'})),
+                       hoverlabel=dict(bgcolor='#161a28'))
     return mfig
 
 
@@ -130,7 +166,7 @@ with open(fips_file, 'r') as f:
 
 city_df, area_df = get_all_tables(config)
 city_fig = make_city_chart(city_df)
-area_map = make_area_map(area_df, min(city_df['time']), 'rides')
+area_map = make_area_map(area_df, min(city_df['time']), 'd_mile')
 
 
 app = dash.Dash(__name__)
@@ -190,9 +226,15 @@ app.layout = html.Div([
                         className='custom-tab',
                         selected_className='custom-tab--selected', 
                         children=[
-                            html.Br(),
-                            html.Div(id='map-desc'),
-                            html.Br(),
+                            html.Div(
+                                id='map-desc',
+                                style={
+                                    'font-size': '1.5rem',  
+                                    'margin-bottom': '0rem',
+                                    'margin-top': '1.5rem',
+                                    'margin-left': '1.5rem'
+                                    }
+                                ),
                             dcc.Graph(
                                 id='area-map',
                                 figure=area_map,
@@ -216,7 +258,7 @@ app.layout = html.Div([
     [Input('time-drop','value'), Input('metric-radio', 'value'),
      Input('interval-counter', 'n_intervals')]
 )
-def update_area_map(time_slider, map_metric, n_intervals):
+def update_charts(time_slider, map_metric, n_intervals):
     city_df, area_df = get_all_tables(config)
     text_field = 'Showing predicted ' + area_cols[map_metric] + ' for ' \
                + city_df.loc[time_slider, 'time'].strftime('%A, %-I %p')

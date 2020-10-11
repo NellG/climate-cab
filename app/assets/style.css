@@ -132,10 +132,10 @@ body {
   line-height: 1.6;
   font-weight: 400;
   font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  /*color: rgb(50, 50, 50);*/
   color: #d8d8d8;
-  /*added*/
-  background-color: #1E1E1E;}
+  background-color: #1e2130;
+  margin-left: 2rem;
+  margin-right: 2rem;}
 
 
 /* Typography
