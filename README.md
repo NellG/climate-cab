@@ -17,7 +17,7 @@ The frontend application runs in Python 3 with Plotly/Dash.
 
 ## Architecture
 
-![image](app/data/TechStackStart.png)
+![image](app/data/TechStackStart.PNG)
 
 Data from the Chicago Data Portal and NOAA are stored in S3. Data aggregation and joining is performed in a Spark batching job. Summary tables are written to PostgreSQL. Airflow coordinates a Python script to join the current weather forecast with the historical data tables. The frontend display is created with Plotly.
 
