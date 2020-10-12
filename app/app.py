@@ -34,7 +34,7 @@ def connect_postgres(config):
 
 
 def get_pg_data(cursor, table):
-    """Get data from table in postgresql database."""
+    """Return data from table in postgresql database."""
     col_str = "SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE "
     col_str += "TABLE_NAME = '" + table + "';"
     cursor.execute(col_str)
@@ -47,6 +47,7 @@ def get_pg_data(cursor, table):
 
 
 def get_all_tables(config):
+    """Connect to postgres and return both data tables."""
     pgconnect = connect_postgres(config)
     pgcursor = pgconnect.cursor()
     city_df = get_pg_data(pgcursor, 'city_forecast')
@@ -57,19 +58,21 @@ def get_all_tables(config):
 
 
 def list_times(df):
-    """Define dict for slider tick mark labels."""
-    ticks = {}
-    start_hr = df.loc[0, 'time'].hour
+    """Return list of dicts for dropdown options."""
+    ticks = []
     for i in df.index:
-        ticks[i] = (df.loc[i, 'time']).strftime('%a %-I %p')
-    ticks[0] = 'now'
+        ticks.append({'label': df.loc[i, 'time'].strftime('%a %-I %p'),
+                      'value': i})
+    ticks[0] = {'label': 'now', 'value': 0}
     return ticks
 
 
 def make_city_chart(city_df):
-    """Plot overall city data."""
+    """4 row multi plot of overall city data."""
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
                         vertical_spacing=0.05)
+
+    # Top row: temperature and precipitation
     fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['tdry'], name='Temperature, F', 
                              marker=dict(color='#ffff72'),
                              hovertemplate='%{x|%b %-d, %-I %p}<br>'+
@@ -79,21 +82,33 @@ def make_city_chart(city_df):
                 row=1, col=1, name='Rain, in x10', customdata=city_df['precip'].values,
                 hovertemplate='%{x|%b %-d, %-I %p}<br>'+
                               '%{customdata:.1f} inches<extra></extra>')
+    fig.update_yaxes(title_text='T \u00B0F <br> Rain 0.1 in', 
+                     title_standoff = 7, row=1, col=1)
+
+    # 2nd row: rides/hour
     fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['rides'], name='# Rides/hour',
                              marker=dict(color='#5bdd9f'),
                              hovertemplate='%{x|%b %-d, %-I %p}<br>'+
                                            '%{y:.0f} rides/hour<extra></extra>'),
                 row=2, col=1)
+    fig.update_yaxes(title_text='# Rides/hour', title_standoff = 0, row=2, col=1)
+    
+    # 3rd row: $/hour/cab
     fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_hr_cab'], name='$/hour/cab',
                              marker=dict(color='#578eb4'),
                              hovertemplate='%{x|%b %-d, %-I %p}<br>'+
                                            '$%{y:.2f}/hour/cab<extra></extra>'),
                 row=3, col=1)
+    fig.update_yaxes(title_text='$/hour/cab', title_standoff = 14, row=3, col=1)
+    
+    # Bottom row: $/mil
     fig.add_trace(go.Scatter(x=city_df['time'], y=city_df['d_mile'], name='$/mile',
                              marker=dict(color='#914ea1'),
                              hovertemplate='%{x|%b %-d, %-I%p}<br>'+
                                            '$%{y:.2f}/mile<extra></extra>'),
                 row=4, col=1)
+    fig.update_yaxes(title_text='$/mile', title_standoff = 21, row=4, col=1)
+    
     fig.update_layout(template='plotly_dark',
                     paper_bgcolor='#161a28', 
                     plot_bgcolor='#161a28', 
@@ -105,27 +120,27 @@ def make_city_chart(city_df):
                     color='#d8d8d8')
     fig.update_yaxes(rangemode='tozero',
                     color='#d8d8d8')
-    fig.update_yaxes(title_text='T \u00B0F <br> Rain 0.1 in', title_standoff = 7, row=1, col=1)
-    fig.update_yaxes(title_text='# Rides/hour', title_standoff = 0, row=2, col=1)
-    fig.update_yaxes(title_text='$/hour/cab', title_standoff = 14, row=3, col=1)
-    fig.update_yaxes(title_text='$/mile', title_standoff = 21, row=4, col=1)
-
     return fig
 
 
 def make_area_map(area_df, time_slider, map_metric):
     """Plot area specific data in choropleth."""
+
+    # Create metric string for hovertext
     area_df['Metrics'] = '<br>' \
                     + area_df['d_mile'].map('${:,.2f}/mile<br>'.format) \
                     + area_df['d_min'].map('${:,.2f}/minute<br>'.format) \
                     + area_df['d_ride'].map('${:,.2f}/ride<br>'.format) \
                     + area_df['rides'].map('{:,.0f} rides/hour'.format)
+    
+    # Set colorbar limits
     if map_metric != 'rides':
         c_max = np.ceil(area_df[map_metric].quantile(q=0.95))
         c_min = np.floor(area_df[map_metric].quantile(q=0.05))
     else:
         c_max = np.ceil(area_df[map_metric].quantile(q=0.99))
         c_min = 20
+    
     mfig = px.choropleth_mapbox(area_df[area_df['time'] == time_slider], 
                                 geojson=areas, 
                                 locations='comm_pick', 
@@ -164,6 +179,7 @@ fips_file = 'data/Boundaries.geojson'
 with open(fips_file, 'r') as f:
     areas = json.loads(f.read())
 
+# Create starting figures
 city_df, area_df = get_all_tables(config)
 city_fig = make_city_chart(city_df)
 area_map = make_area_map(area_df, min(city_df['time']), 'd_mile')
@@ -183,8 +199,7 @@ app.layout = html.Div([
             html.Br(),
             dcc.Dropdown(
                 id='time-drop',
-                options=[{'label': list_times(city_df)[i],
-                          'value': i} for i in list_times(city_df)],
+                options=list_times(city_df),
                 value=0,
                 style={'color':'#1e1e1e'}
             ),
@@ -196,7 +211,6 @@ app.layout = html.Div([
             )
         ]
     ),
-
     html.Div(
         id="right-column",
         className="nine columns",
@@ -245,7 +259,7 @@ app.layout = html.Div([
             ),
             dcc.Interval(
                 id='interval-counter',
-                interval=15*60*1000, # 15 minutes
+                interval=15*60*1000, # update @15 min to get new forecast
                 n_intervals=0
             )
         ]
@@ -254,17 +268,20 @@ app.layout = html.Div([
 
 @app.callback(
     [Output('map-desc', 'children'), Output('area-map', 'figure'),
-     Output('city-forecast', 'figure'), Output('time-drop', 'marks')],
+     Output('city-forecast', 'figure'), Output('time-drop', 'options')],
     [Input('time-drop','value'), Input('metric-radio', 'value'),
      Input('interval-counter', 'n_intervals')]
 )
 def update_charts(time_slider, map_metric, n_intervals):
+    """Update charts and dropdown when changes are made or 15 min passes."""
     city_df, area_df = get_all_tables(config)
     text_field = 'Showing predicted ' + area_cols[map_metric] + ' for ' \
                + city_df.loc[time_slider, 'time'].strftime('%A, %-I %p')
 
     city_fig = make_city_chart(city_df)
-    area_map = make_area_map(area_df, city_df.loc[time_slider, 'time'], map_metric)
+    area_map = make_area_map(area_df, 
+                             city_df.loc[time_slider, 'time'], 
+                             map_metric)
     
     return text_field, area_map, city_fig, list_times(city_df)
 
