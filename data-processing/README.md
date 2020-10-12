@@ -7,4 +7,4 @@ Data aggregation occurs in three main steps:
 1. The hourly cab data is joined to hourly weather data
 1. The joined hourly data is aggregated again from 1 record per hour to 1 record per [day, hour, area, temperature, precipitation] combination
 
-![image](DataFlow.png)
+![image](DataFlow.PNG)
