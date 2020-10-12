@@ -38,6 +38,3 @@ forecast = BashOperator(
     bash_command = 'python3 /home/ubuntu/code/owm-data.py',
     dag = dag 
 )
-
-# setting dependencies
-forecast

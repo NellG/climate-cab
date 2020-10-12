@@ -81,7 +81,7 @@ def get_history_data(pgcursor, table, d_min=1, d_max=7, t_min=-100, t_max=200):
 
 
 def join_tables(histdf, foredf):
-    """Join history and forecase data on weather criterion and return."""
+    """Join history and forecast data on weather criterion and return."""
     joindf = pd.merge_asof(foredf[foredf.crit.notnull()], 
                        histdf[histdf.crit.notnull()], 
                        on='crit', direction='nearest') \
@@ -90,7 +90,7 @@ def join_tables(histdf, foredf):
 
 
 def save_table(pgcursor, table, df):
-    """Clear existing data and insert data from df."""
+    """Clear existing data from postgres table and insert data from df."""
     clr_str = "TRUNCATE TABLE " + table + ";"
     pgcursor.execute(clr_str)
 
@@ -110,8 +110,6 @@ def save_table(pgcursor, table, df):
 
 def update_forecast():
     """Update cab forecast and save in postgreSQL."""
-
-    print("I'm running.")
     # read config file for Open Weather API and
     # postres db, connect to db
     config = read_config()
@@ -148,7 +146,6 @@ def update_forecast():
     pgcursor.close()
     pgconnect.close()
 
-    print("I'm done running.")
 
 if __name__ == '__main__':
     update_forecast()
