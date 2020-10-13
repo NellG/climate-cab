@@ -10,7 +10,7 @@ import csv
 
 def read_config():
     """Read config file and return dict."""
-    with open('/home/ubuntu/code/.owm-config.csv') as infile:
+    with open('/home/ubuntu/data-processing/.owm-config.csv') as infile:
         reader = csv.reader(infile)
         config = {row[0]: row[1] for row in reader}
     return config
