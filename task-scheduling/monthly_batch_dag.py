@@ -19,8 +19,6 @@ def read_config():
 config = read_config()
 cab_url = 'https://data.cityofchicago.org/api/views/r2u4-wwk3/rows.csv?accessType=DOWNLOAD'
 cab_file = 'chi_2020.csv'
-wthr_url = '???'
-wthr_file = 'chi-weather_2020.csv'
 wthr_email = 'Visit NOAA at https://www.ncdc.noaa.gov/cdo-web/datatools/lcd' \
            + ' and requst this years local weather for Midway weather station.' \
            + ' Upload csv to chi-cab-bucket/weather, replacing previous file.'
@@ -43,7 +41,6 @@ dag = DAG(
     default_args = default_args
 )
 
-# Worked in test
 wthr_email = EmailOperator(
     task_id = 'update_weather_data',
     to = config['email'],
@@ -52,7 +49,6 @@ wthr_email = EmailOperator(
     dag = dag 
 )
 
-# Worked in test
 cab_download = BashOperator(
     task_id = 'download_cab_data',
     retries = 0,
@@ -60,15 +56,14 @@ cab_download = BashOperator(
     dag = dag 
 )
 
-# Worked in test
 cab_upload = BashOperator(
     task_id = 'upload_cab_data_to_s3',
-    bash_command = 'aws s3 cp ~/data/' + cab_file \
+    bash_command = 'source /home/ubuntu/.profile && ' \
+                 + 'aws s3 cp ~/data/' + cab_file \
                  + ' s3://chi-cab-bucket/taxi/' + cab_file,
     dag = dag
 )
 
-# Worked in test
 run_spark = BashOperator(
     task_id = 'run_spark',
     retries = 0,

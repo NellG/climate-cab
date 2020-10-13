@@ -183,9 +183,9 @@ if __name__ == '__main__':
     # save summary table for community areas
     cabs_area = aggregate_cabs(cabs, ['startrnd', 'comm_pick'])
     hist_area = agg_cabs_and_wthr(cabs_area, wthr)
-    write_table(hist_area, 'areahistory_w2020')
+    write_table(hist_area, 'areahistory')
 
     # save summary table for whole city
     cabs_city = aggregate_cabs(cabs, ['startrnd'])
     hist_city = agg_cabs_and_wthr(cabs_city, wthr)
-    write_table(hist_city, 'cityhistory_w2020')
+    write_table(hist_city, 'cityhistory')

@@ -11,13 +11,13 @@ Taximizer is a batching pipeline, database, and web app which predicts taxi inco
 
 Use `RunSpark.sh` to aggregate historical data for Taximizer. The script requires Spark running on a distributed cluster, input .csv data files stored in an S3 bucket, and a PostgreSQL database to store the output tables.
 
-To update the current forecast table every 15 minutes, install Airflow and run `task-scheduling/forecast_dag.py`.
+To update the historical tables and current forecast tables, install Airflow and run the dags in `task-scheduling`. The Spark batch job will be rerun monthly with updated cab and weather data. The forecast tables will be updated every 15 minutes.
 
 The frontend application runs in Python 3 with Plotly/Dash.
 
 ## Architecture
 
-![image](app/data/TechStackStart.PNG)
+![image](app/data/TechStack.PNG)
 
 Data from the Chicago Data Portal and NOAA are stored in S3. Data aggregation and joining is performed in a Spark batching job. Summary tables are written to PostgreSQL. Airflow coordinates a Python script to join the current weather forecast with the historical data tables. The frontend display is created with Plotly.
 
