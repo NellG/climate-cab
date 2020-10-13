@@ -1,5 +1,6 @@
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.email_operator import EmailOperator
 from datetime import datetime
 from datetime import timedelta
 import csv
@@ -20,6 +21,9 @@ cab_url = 'https://data.cityofchicago.org/api/views/r2u4-wwk3/rows.csv?accessTyp
 cab_file = 'chi_2020.csv'
 wthr_url = '???'
 wthr_file = 'chi-weather_2020.csv'
+wthr_email = 'Visit NOAA at https://www.ncdc.noaa.gov/cdo-web/datatools/lcd' \
+           + ' and requst this years local weather for Midway weather station.' \
+           + ' Upload csv to chi-cab-bucket/weather, replacing previous file.'
 
 default_args = {
     'owner': 'airflow',
@@ -34,24 +38,21 @@ default_args = {
 
 dag = DAG(
     dag_id = 'monthly_batch_dag',
-    description = 'Download cab and weather data and move to S3.',
-    schedule_interval = timedelta(months=1),
+    description = 'Update data and rerun batch job.',
+    schedule_interval = timedelta(days=30),
     default_args = default_args
 )
 
-wthr_download = BashOperator(
-    task_id = 'download_weather_data',
-    bash_command = '???',
+# Worked in test
+wthr_email = EmailOperator(
+    task_id = 'update_weather_data',
+    to = config['email'],
+    subject = 'Update weather data in S3',
+    html_content = wthr_email,
     dag = dag 
 )
 
-wther_upload = BashOperator(
-    task_id = 'upload_weather_data_to_s3',
-    bash_command = 'aws s3 cp ~/data/' + wthr_file \
-                 + ' s3://chi-cab-bucket/weather/' + wthr_file,
-    dag = dag
-)
-
+# Worked in test
 cab_download = BashOperator(
     task_id = 'download_cab_data',
     retries = 0,
@@ -59,6 +60,7 @@ cab_download = BashOperator(
     dag = dag 
 )
 
+# Worked in test
 cab_upload = BashOperator(
     task_id = 'upload_cab_data_to_s3',
     bash_command = 'aws s3 cp ~/data/' + cab_file \
@@ -66,11 +68,13 @@ cab_upload = BashOperator(
     dag = dag
 )
 
+# Worked in test
 run_spark = BashOperator(
     task_id = 'run_spark',
-    bash_command = '???',
+    retries = 0,
+    bash_command = "ssh controller 'sh ~/data-processing/RunSpark.sh'",
     dag = dag
 )
 
 # setting dependencies
-wthr_download >> wthr_upload >> cab_download >> cab_upload >> run_spark
+wthr_email >> cab_download >> cab_upload >> run_spark

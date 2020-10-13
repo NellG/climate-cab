@@ -140,7 +140,6 @@ def update_forecast():
     for area in range(a_min, a_max):
         adder = join_tables(areadf[areadf['comm_pick'] == area+1], foredf)
         areapred = areapred.append(adder, ignore_index=True)
-    # Scale factor for regional $/cab/hr: 1.39
     save_table(pgcursor, 'area_forecast', areapred)
     pgconnect.commit()
     pgcursor.close()

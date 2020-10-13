@@ -9,9 +9,17 @@ from pyspark.sql.types import StructType
 from pyspark.sql.utils import AnalysisException
 
 
+def read_config():
+    """Read config file and return dict."""
+    with open('/home/ubuntu/data-processing/.spark-config.csv') as infile:
+        reader = csv.reader(infile)
+        config = {row[0]: row[1] for row in reader}
+    return config
+
+
 def make_schema(schema_file):
     """Define schema based on .csv input."""
-    with open(schema_file, newline='') as f:
+    with open('/home/ubuntu/data-processing/'+schema_file, newline='') as f:
         reader = csv.reader(f)
         schema_cols = list(reader)
     schema = StructType()
@@ -22,7 +30,10 @@ def make_schema(schema_file):
 
 def read_bucket(spark, bucket, folder):
     """Read a csv files in bucket/folder into dataFrame."""
-    s3 = boto3.resource('s3')
+    config = read_config()
+    s3 = boto3.resource('s3', 
+                        aws_access_key_id=config['aws_key'],
+                        aws_secret_access_key=config['aws_secret'])
     s3_path = 's3a://'+bucket+'/'
     s3_bucket = s3.Bucket(bucket)
     schema = folder + '_schema.csv'
@@ -132,9 +143,7 @@ def agg_cabs_and_wthr(cabs, wthr):
 
 def write_table(df, table):
     """Write history table to postgresql database."""
-    with open('/home/ubuntu/code/.spark-config.csv') as infile:
-        reader = csv.reader(infile)
-        config = {row[0]: row[1] for row in reader}
+    config = read_config()
     dburl = config['dburl']
     user = config['user']
     password = config['password']
@@ -174,9 +183,9 @@ if __name__ == '__main__':
     # save summary table for community areas
     cabs_area = aggregate_cabs(cabs, ['startrnd', 'comm_pick'])
     hist_area = agg_cabs_and_wthr(cabs_area, wthr)
-    write_table(hist_area, 'areahistory')
+    write_table(hist_area, 'areahistory_w2020')
 
     # save summary table for whole city
     cabs_city = aggregate_cabs(cabs, ['startrnd'])
     hist_city = agg_cabs_and_wthr(cabs_city, wthr)
-    write_table(hist_city, 'cityhistory')
+    write_table(hist_city, 'cityhistory_w2020')
