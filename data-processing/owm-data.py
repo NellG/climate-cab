@@ -134,8 +134,8 @@ def update_forecast():
     areadf = get_history_data(pgcursor, 'areahistory', d_min, d_max, t_min, t_max)
     calculate_criteria(areadf)
     areadf['comm_pick'] = pd.to_numeric(areadf['comm_pick'])
-    a_min = int(min(areadf['comm_pick']))
-    a_max = int(max(areadf['comm_pick']))
+    a_min = int(min(areadf.loc[areadf['comm_pick'].notna(), 'comm_pick']))
+    a_max = int(max(areadf.loc[areadf['comm_pick'].notna(), 'comm_pick']))
     areapred = join_tables(areadf[areadf['comm_pick']==a_min], foredf)
     for area in range(a_min, a_max):
         adder = join_tables(areadf[areadf['comm_pick'] == area+1], foredf)

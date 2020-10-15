@@ -8,7 +8,7 @@ import csv
 
 def read_config():
     """Read config file and return dict."""
-    with open('/home/ubuntu/code/.airflow-config.csv') as infile:
+    with open('/home/ubuntu/task-scheduling/.airflow-config.csv') as infile:
         reader = csv.reader(infile)
         config = {row[0]: row[1] for row in reader}
     return config
@@ -35,6 +35,6 @@ dag = DAG(
 
 forecast = BashOperator(
     task_id = 'update_forecast',
-    bash_command = 'python3 /home/ubuntu/code/owm-data.py',
+    bash_command = 'python3 /home/ubuntu/data-processing/owm-data.py',
     dag = dag 
 )
