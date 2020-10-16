@@ -79,7 +79,8 @@ def make_city_chart(city_df):
                                            '%{y:.0f}\u00B0F<extra></extra>'),
                 row=1, col=1)
     fig.add_bar(x=city_df['time'], y=city_df['precip']*10, marker=dict(color='#578eb4'),
-                row=1, col=1, name='Rain, in x10', customdata=city_df['precip'].values,
+                width= 1000*60*50, row=1, col=1, name='Rain, in x10', 
+                customdata=city_df['precip'].values,
                 hovertemplate='%{x|%b %-d, %-I %p}<br>'+
                               '%{customdata:.1f} inches<extra></extra>')
     fig.update_yaxes(title_text='T \u00B0F <br> Rain 0.1 in', 
